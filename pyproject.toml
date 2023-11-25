@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "awwdio"
+version = "0.3.0"
+description = "audio playing server for playing audio as a server"
+authors = ["Matt Stancliff <matt@genges.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pygame = "^2.5.2"
+loguru = "^0.7.2"
+fastapi = "^0.104.0"
+fire = "^0.5.0"
+hypercorn = "^0.15.0"
+scheduler = "^0.8.4"
+pytz = "^2023.3.post1"
+pendulum = {version = "^3.0.0b1", allow-prereleases = true}
+
+[tool.poetry.scripts]
+awwdio = "awwdio.awwdio:cmd"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

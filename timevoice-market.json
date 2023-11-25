@@ -1,0 +1,15 @@
+[
+    {"interval": "daily", "when": "09:25:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "5 UNTIL OPEN!"},
+    {"interval": "daily", "when": "09:30:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "START OF DAY!"},
+    {"interval": "daily", "when": "09:55:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "END OF MORNING RUSH!"},
+    {"interval": "daily", "when": "10:55:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "ELEVEN AM FUCKERY BEGINS SOON!"},
+    {"interval": "daily", "when": "12:50:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "TEN MINUTES UNTIL 1 PM VOLATILITY!"},
+    {"interval": "daily", "when": "13:55:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "2 P.M. News Window Soon!"},
+    {"interval": "daily", "when": "14:55:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "POWER HOUR BEGINS!"},
+    {"interval": "daily", "when": "15:50:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "TEN TO CLOSE!"},
+    {"interval": "daily", "when": "15:55:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "FIVE TO CLOSE!"},
+    {"interval": "daily", "when": "15:58:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "TWO MINUTES TO CLOSE!"},
+    {"interval": "daily", "when": "15:59:30", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "30 SECONDS!"},
+    {"interval": "daily", "when": "16:00:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "END OF DAY!"},
+    {"interval": "daily", "when": "17:55:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "FUTS OPEN SOON"}
+]
