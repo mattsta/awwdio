@@ -11,5 +11,7 @@
     {"interval": "daily", "when": "15:58:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "TWO MINUTES TO CLOSE!"},
     {"interval": "daily", "when": "15:59:30", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "30 SECONDS!"},
     {"interval": "daily", "when": "16:00:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "END OF DAY!"},
-    {"interval": "daily", "when": "17:55:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "FUTS OPEN SOON"}
+    {"interval": "daily", "when": "17:55:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "FUTS OPEN SOON"},
+    {"interval": "daily", "when": "20:00:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "AFTER HOURS CLOSED"},
+    {"interval": "daily", "when": "20:10:00", "tz": "US/Eastern", "voice": "Oliver (Enhanced)", "say": "SPX GTH OPTIONS OPEN SOON"}
 ]
