@@ -2,7 +2,7 @@ import asyncio
 import datetime
 
 import json
-import multiprocessing
+import threading
 import os
 import pathlib
 import pprint as pp
@@ -25,14 +25,13 @@ from loguru import logger
 from scheduler.asyncio import Scheduler
 
 
-multiprocessing.set_start_method("fork")
-
 ET = pytz.timezone("US/Eastern")
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
 import pygame
 
 
+@logger.catch
 def sayThingWhatNeedBeSaid(how_many, voice, what, speed, count):
     # Voices can be listed with: say -v\?
     # On older versions, the macOS `say` command randomly exits with an error of "Speaking failed: -128"
@@ -57,10 +56,10 @@ def sayThingWhatNeedBeSaid(how_many, voice, what, speed, count):
             logger.error("Goodbye!")
             p.kill()
             p.wait()
-            sys.exit(0)
 
 
-def speakerRunner(q):
+@logger.catch
+def speakerRunner(speakers, notify):
     """Function running as a Process() receiving the update queue messages and playing songs.
 
     This pattern is because speaking through `say` pauses the program for the duration of
@@ -70,26 +69,26 @@ def speakerRunner(q):
     one phrase can be spoken at once because this speech runner is just one single-threaded
     worker consuming a linear queue of events."""
     while True:
-        try:
-            # "msg" is a tuple of arguments, we then apply to the function
-            msg: tuple[Any] = q.get()
-        except KeyboardInterrupt:
-            logger.warning("Goodbye!")
-            return
-        except:
-            logger.exception("How did the queue break?")
+        while not speakers:
+            notify.wait()
 
-        try:
-            sayThingWhatNeedBeSaid(*msg)
-        except (KeyboardInterrupt, SystemExit):
-            logger.info("Goodbye!")
-            sys.exit(0)
-            return
-        except:
-            logger.exception("Speaking no speaking?")
-        finally:
-            # queue entries are always done even if they throw exceptions
-            q.task_done()
+        remove = dict()
+
+        # we store speak requests in a dict/Counter to automatically de-duplicate
+        # sayings if multiple of the same speak requests show up too quickly together.
+        # logger.info("Waking to process: {}", self.speaker)
+        for key, count in speakers.copy().items():
+            voice, say, speed = key
+            sayThingWhatNeedBeSaid(-1, voice, say, speed, count)
+            remove[key] = count
+
+        # this is probably a race condtion, but it's fine for now?
+        # decrement count by our SPOKEN COUNT so if we still received events
+        # while speaking we re-deliver the extra count updates.
+        for key, count in remove.items():
+            speakers[key] -= count
+            if speakers[key] <= 0:
+                del speakers[key]
 
 
 @dataclass
@@ -103,10 +102,7 @@ class Awwdio:
     # deduplicating/debounce mechanism to avoid close-in-time received repeats
     speaker: Counter = field(default_factory=Counter)
 
-    # queue for the worker process to receive speech events
-    q: multiprocessing.JoinableQueue = field(
-        default_factory=multiprocessing.JoinableQueue
-    )
+    notify: threading.Event = field(default_factory=threading.Event)
 
     def __post_init__(self) -> None:
         pygame.mixer.init()
@@ -132,25 +128,9 @@ class Awwdio:
         ps = pygame.mixer.Sound(file=self.sounds.get(what))
         ps.play()
 
-    def speak(self, voice, what, speed=250, count=0) -> None:
-        self.how_many += 1
-        self.q.put((self.how_many, voice, what, speed, count))
-
-    async def wakevoice(self) -> None:
-        remove = []
-
-        # we store speak requests in a dict/Counter to automatically de-duplicate
-        # sayings if multiple of the same speak requests show up too quickly together.
-        # logger.info("Waking to process: {}", self.speaker)
-        for key, count in self.speaker.items():
-            voice, say, speed = key
-            # Note: this doesn't speak directly — it just enqueues into the background worker.
-            self.speak(voice, say, speed, count=count)
-            remove.append(key)
-
-        # this is probably a race condtion, but it's fine for now?
-        for key in remove:
-            del self.speaker[key]
+    def speak(self, voice, say, speed):
+        self.speaker[(voice, say, speed)] += 1
+        self.notify.set()
 
     def start(self, host: str = "127.0.0.1", port: int = 8000) -> None:
         @self.app.get("/play")
@@ -174,7 +154,7 @@ class Awwdio:
             voice: str = "Alex", say: str = "Hello There", speed: int = 250
         ):
             logger.info("Received: {}", (voice, say, speed))
-            self.speaker[(voice, say, speed)] += 1
+            self.speak(voice, say, speed)
             # logger.info("Current queue: {}", self.speaker)
 
         # instead of running an external process-worker webserver, run it all locally
@@ -191,10 +171,11 @@ class Awwdio:
         async def launch_hypercorn():
             async def speakToMe(voice, say, speed=250):
                 """Add speech request to speaker deduplication/debounce system."""
-                self.speaker[(voice, say, speed)] += 1
+                self.speak(voice, say, speed)
 
             # Parse scheduled event feed then
             # Schedule our schedule of events
+            # https://digon.io/hyd/project/scheduler/t/master/pages/examples/quick_start.html
             schedule = Scheduler(tzinfo=datetime.timezone.utc)
             for timevoice in self.timevoices:
                 for row in json.loads(timevoice.read_bytes()):
@@ -232,30 +213,23 @@ class Awwdio:
             if self.timevoices:
                 logger.info("SCHEDULED EVENTS: {}", schedule)
 
-            # https://digon.io/hyd/project/scheduler/t/master/pages/examples/quick_start.html
-
-            # every 300ms check the speak queue.
-            # we don't run speaking events immediately when they are received because
-            # sometimes an external system will send us 10 notifications for the same
-            # thing all at once, so we want to add a small deduplication time buffer.
-            # (this isn't _perfect_ because duplicate requests can arrive while a current
-            #  request is being played (so: request -> (remove and speak) || (arrive and queue) -> (remove and speak)),
-            #  but there isn't a great way around it unless we want the speaker to enqueue a start/end speaking
-            #  timestamp to then go back and delete messages from its speaking interval, but then we have
-            #  uncounted duplicates not being spoken for?)
-            schedule.cyclic(datetime.timedelta(milliseconds=300), self.wakevoice)
-
             await serve(self.app, config)
 
         try:
-            p = multiprocessing.Process(
-                target=speakerRunner, args=(self.q,), daemon=True
-            )
+            p = threading.Thread(target=speakerRunner, args=(self.speaker, self.notify))
+
+            # without p.daemon, the Thread refuses to recognize KeyboardInterrupt properly and
+            # then it requires a double CTRL-C to exit. Now it exits cleanly with one CTRL-C, but
+            # it just exits abruptly now and nothing really catches it anymore. Look into fixing maybe.
+            p.daemon = True
             p.start()
 
             asyncio.run(launch_hypercorn())
         except (KeyboardInterrupt, SystemExit):
             logger.warning("Goodbye...")
+            logger.warning(
+                "Remaining speak events unspoken: {}", pp.pformat(self.speaker)
+            )
             p.terminate()
             p.join()
             return
