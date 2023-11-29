@@ -72,6 +72,10 @@ def speakerRunner(speakers, notify):
         while not speakers:
             notify.wait()
 
+        # reset the 'notify' wakeup flag to false so we sleep again the next time if there's
+        # no new updates ready.
+        notify.clear()
+
         remove = dict()
 
         # we store speak requests in a dict/Counter to automatically de-duplicate
