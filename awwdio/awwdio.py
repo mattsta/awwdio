@@ -38,17 +38,14 @@ def sayThingWhatNeedBeSaid(how_many, voice, what, speed, count):
     # so if we get an error code, KEEP TRYING FOREVER instead of dropping messages.
     got = 1
     while got == 1:
-        logger.info("[{} :: {} ({})] Speaking: {}", how_many, voice, count, what)
-
-        extra = ""
         if count and count > 1:
-            extra = f" (repeated {count})"
+            what += f" (repeated {count})"
+
+        logger.info("[{} :: {} ({})] Speaking: {}", how_many, voice, count, what)
 
         try:
             # TODO: add TIME speaking event log (and if older than 15-30 seconds, don't speak). (also speak OLD TIME if older than 3 seconds)
-            p = subprocess.Popen(
-                shlex.split(f'say -v "{voice}" -r {speed} "{what}{extra}"')
-            )
+            p = subprocess.Popen(shlex.split(f'say -v "{voice}" -r {speed} "{what}"'))
 
             got = p.wait()
         except:
