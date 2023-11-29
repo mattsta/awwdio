@@ -25,10 +25,19 @@ from loguru import logger
 from scheduler.asyncio import Scheduler
 
 
-ET = pytz.timezone("US/Eastern")
-
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
 import pygame
+
+
+@dataclass(slots=True, frozen=True)
+class SpeakEvent:
+    voice: str = "Alex"
+    say: str = "HELLO HELLO"
+    speed: int = 250
+
+    # if provided, don't speak this event if it is older than this epoch timestamp,
+    # but also mark this field as not part of the object value for deduplication.
+    deadline: int | float | None = field(default=None, compare=False, hash=False)
 
 
 @logger.catch
@@ -78,18 +87,31 @@ def speakerRunner(speakers, notify):
         # we store speak requests in a dict/Counter to automatically de-duplicate
         # sayings if multiple of the same speak requests show up too quickly together.
         # logger.info("Waking to process: {}", self.speaker)
-        for key, count in speakers.copy().items():
-            voice, say, speed = key
-            sayThingWhatNeedBeSaid(-1, voice, say, speed, count)
-            remove[key] = count
+        for event, count in speakers.copy().items():
+            remove[event] = count
+
+            # yes, fetch the timestamp on EACH iteration because speaking can take multiple
+            # seconds and cause time to slip between each check here.
+            now = datetime.datetime.now().timestamp()
+
+            # if this event's speaking deadline has expired, don't perform the action.
+            if event.deadline and now > event.deadline:
+                logger.info(
+                    "[Ignoring] {:.2f} seconds over deadline: {}",
+                    now - event.deadline,
+                    event,
+                )
+                continue
+
+            sayThingWhatNeedBeSaid(-1, event.voice, event.say, event.speed, count)
 
         # this is probably a race condtion, but it's fine for now?
         # decrement count by our SPOKEN COUNT so if we still received events
         # while speaking we re-deliver the extra count updates.
         for key, count in remove.items():
-            speakers[key] -= count
-            if speakers[key] <= 0:
-                del speakers[key]
+            speakers[event] -= count
+            if speakers[event] <= 0:
+                del speakers[event]
 
 
 @dataclass
@@ -105,6 +127,8 @@ class Awwdio:
 
     notify: threading.Event = field(default_factory=threading.Event)
 
+    # TODO: still need to print "X in backlog" events
+    # TODO: still need to fix print-remaining-buffer-on-exit for trapping thread exit better
     def __post_init__(self) -> None:
         pygame.mixer.init()
 
@@ -129,8 +153,8 @@ class Awwdio:
         ps = pygame.mixer.Sound(file=self.sounds.get(what))
         ps.play()
 
-    def speak(self, voice, say, speed):
-        self.speaker[(voice, say, speed)] += 1
+    def speak(self, voice, say, speed, deadline=None):
+        self.speaker[SpeakEvent(voice, say, speed, deadline=deadline)] += 1
         self.notify.set()
 
     def start(self, host: str = "127.0.0.1", port: int = 8000) -> None:
@@ -152,10 +176,13 @@ class Awwdio:
 
         @self.app.get("/say")
         async def sayit(
-            voice: str = "Alex", say: str = "Hello There", speed: int = 250
+            voice: str = "Alex",
+            say: str = "Hello There",
+            speed: int = 250,
+            deadline: int | float | None = None,
         ):
-            logger.info("Received: {}", (voice, say, speed))
-            self.speak(voice, say, speed)
+            logger.info("Received: {}", (voice, say, speed, deadline))
+            self.speak(voice, say, speed, deadline)
             # logger.info("Current queue: {}", self.speaker)
 
         # instead of running an external process-worker webserver, run it all locally

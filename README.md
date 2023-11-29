@@ -28,11 +28,12 @@ The API is simple.
 
 There are two endpoints:
 
-- `/say?voice=X&say=Y&speed=Z`
+- `/say?voice=X&say=Y&speed=Z&deadline=epoch`
   - `voice` is an installed macos voice (System Settings -> Spoken Content -> System voice -> Manage Voices...)
     - can also be viewed with command line `say -v\?`
   - `say` is the phrase to speak
   - `speed` is the speech rate
+  - `deadline` is an optional epoch timestamp where the event must be spoken BEFORE the timestamp or the message is dropped
   - All those options have defaults, so you can just call `/say` and it will do something.
 
 - `/play?sound=X`
