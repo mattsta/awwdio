@@ -29,7 +29,7 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
 import pygame
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True, unsafe_hash=True, order=True)
 class SpeakEvent:
     voice: str = "Alex"
     say: str = "HELLO HELLO"
@@ -39,19 +39,21 @@ class SpeakEvent:
     # but also mark this field as not part of the object value for deduplication.
     deadline: int | float | None = field(default=None, compare=False, hash=False)
 
+    priority: int = 0
+
+    sort_index: int = field(default=0, compare=False, hash=False)
+
+    def __post_init__(self) -> None:
+        self.sort_index = (self.priority, self.deadline)
+
 
 @logger.catch
-def sayThingWhatNeedBeSaid(how_many, voice, what, speed, count):
+def sayThingWhatNeedBeSaid(voice, what, speed):
     # Voices can be listed with: say -v\?
     # On older versions, the macOS `say` command randomly exits with an error of "Speaking failed: -128"
     # so if we get an error code, KEEP TRYING FOREVER instead of dropping messages.
     got = 1
     while got == 1:
-        if count and count > 1:
-            what += f" (repeated {count})"
-
-        logger.info("[{} :: {} ({})] Speaking: {}", how_many, voice, count, what)
-
         try:
             # TODO: add TIME speaking event log (and if older than 15-30 seconds, don't speak). (also speak OLD TIME if older than 3 seconds)
             p = subprocess.Popen(shlex.split(f'say -v "{voice}" -r {speed} "{what}"'))
@@ -74,6 +76,8 @@ def speakerRunner(speakers, notify):
     Now the web server can continue to receive requests while speech is running, but only
     one phrase can be spoken at once because this speech runner is just one single-threaded
     worker consuming a linear queue of events."""
+
+    ran = 0
     while True:
         while not speakers:
             notify.wait()
@@ -84,11 +88,12 @@ def speakerRunner(speakers, notify):
 
         remove = dict()
 
-        # we store speak requests in a dict/Counter to automatically de-duplicate
-        # sayings if multiple of the same speak requests show up too quickly together.
-        # logger.info("Waking to process: {}", self.speaker)
-        for event, count in speakers.copy().items():
-            remove[event] = count
+        # order elements in the task queue by (priority, deadline) for processing in priority order
+        for event, count in sorted(speakers.items()):
+            # clean up speaker origin by removing this internal count and dropping the element if it's now zero
+            speakers[event] -= count
+            if speakers[event] <= 0:
+                del speakers[event]
 
             # yes, fetch the timestamp on EACH iteration because speaking can take multiple
             # seconds and cause time to slip between each check here.
@@ -97,21 +102,26 @@ def speakerRunner(speakers, notify):
             # if this event's speaking deadline has expired, don't perform the action.
             if event.deadline and now > event.deadline:
                 logger.info(
-                    "[Ignoring] {:.2f} seconds over deadline: {}",
+                    "[Ignoring] {:.2f} seconds expired: {}",
                     now - event.deadline,
                     event,
                 )
                 continue
 
-            sayThingWhatNeedBeSaid(-1, event.voice, event.say, event.speed, count)
+            if count and count > 1:
+                event.say += f" (repeated {count})"
 
-        # this is probably a race condtion, but it's fine for now?
-        # decrement count by our SPOKEN COUNT so if we still received events
-        # while speaking we re-deliver the extra count updates.
-        for key, count in remove.items():
-            speakers[event] -= count
-            if speakers[event] <= 0:
-                del speakers[event]
+            ran += 1
+            logger.info(
+                "[{} :: {} :: {} :: {}]: {}",
+                ran,
+                count,
+                event.priority,
+                event.voice,
+                event.say,
+            )
+
+            sayThingWhatNeedBeSaid(event.voice, event.say, event.speed)
 
 
 @dataclass
@@ -153,8 +163,10 @@ class Awwdio:
         ps = pygame.mixer.Sound(file=self.sounds.get(what))
         ps.play()
 
-    def speak(self, voice, say, speed, deadline=None):
-        self.speaker[SpeakEvent(voice, say, speed, deadline=deadline)] += 1
+    def speak(self, voice, say, speed, deadline=None, priority=0):
+        self.speaker[
+            SpeakEvent(voice, say, speed, deadline=deadline, priority=priority)
+        ] += 1
         self.notify.set()
 
     def start(self, host: str = "127.0.0.1", port: int = 8000) -> None:
@@ -180,9 +192,10 @@ class Awwdio:
             say: str = "Hello There",
             speed: int = 250,
             deadline: int | float | None = None,
+            prio: int = 100,
         ):
-            logger.info("Received: {}", (voice, say, speed, deadline))
-            self.speak(voice, say, speed, deadline)
+            # logger.info("Received: {}", (voice, say, speed, deadline, priority))
+            self.speak(voice, say, speed, deadline, prio)
             # logger.info("Current queue: {}", self.speaker)
 
         # instead of running an external process-worker webserver, run it all locally
@@ -199,7 +212,7 @@ class Awwdio:
         async def launch_hypercorn():
             async def speakToMe(voice, say, speed=250):
                 """Add speech request to speaker deduplication/debounce system."""
-                self.speak(voice, say, speed)
+                self.speak(voice, say, speed, 0)
 
             # Parse scheduled event feed then
             # Schedule our schedule of events
