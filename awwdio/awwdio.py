@@ -86,10 +86,10 @@ def speakerRunner(speakers, notify):
         # no new updates ready.
         notify.clear()
 
-        remove = dict()
-
         # order elements in the task queue by (priority, deadline) for processing in priority order
-        for event, count in sorted(speakers.items()):
+        everything = sorted(speakers.items())
+        everythingLen = len(everything)
+        for idx, (event, count) in enumerate(everything):
             # clean up speaker origin by removing this internal count and dropping the element if it's now zero
             speakers[event] -= count
             if speakers[event] <= 0:
@@ -99,29 +99,33 @@ def speakerRunner(speakers, notify):
             # seconds and cause time to slip between each check here.
             now = datetime.datetime.now().timestamp()
 
-            # if this event's speaking deadline has expired, don't perform the action.
+            # if this event's speaking deadline has expired, don't speak anything.
             if event.deadline and now > event.deadline:
                 logger.info(
-                    "[Ignoring] {:.2f} seconds expired: {}",
+                    "[Ignoring] :: {}] {:.2f} seconds expired: {}",
+                    count,
                     now - event.deadline,
                     event,
                 )
                 continue
 
-            if count and count > 1:
-                event.say += f" (repeated {count})"
+            say = event.say
+            if count > 1:
+                say += f" (repeated {count})"
 
             ran += 1
             logger.info(
-                "[{} :: {} :: {} :: {}]: {}",
+                "[{} of {} :: {} :: {} :: {} :: {}]: {}",
+                idx + 1,
+                everythingLen,
                 ran,
                 count,
                 event.priority,
                 event.voice,
-                event.say,
+                say,
             )
 
-            sayThingWhatNeedBeSaid(event.voice, event.say, event.speed)
+            sayThingWhatNeedBeSaid(event.voice, say, event.speed)
 
 
 @dataclass
