@@ -16,6 +16,7 @@ hypercorn = "^0.15.0"
 scheduler = "^0.8.4"
 pytz = "^2023.3.post1"
 pendulum = {version = "^3.0.0b1", allow-prereleases = true}
+sortedcontainers = "^2.4.0"
 
 [tool.poetry.scripts]
 awwdio = "awwdio.awwdio:cmd"

@@ -12,7 +12,7 @@ import shlex
 import subprocess
 import sys
 import time
-from collections import Counter
+from sortedcontainers import SortedDict
 
 from dataclasses import dataclass, field
 
@@ -87,13 +87,12 @@ def speakerRunner(speakers, notify):
         notify.clear()
 
         # order elements in the task queue by (priority, deadline) for processing in priority order
-        everything = sorted(speakers.items())
-        everythingLen = len(everything)
-        for idx, (event, count) in enumerate(everything):
-            # clean up speaker origin by removing this internal count and dropping the element if it's now zero
-            speakers[event] -= count
-            if speakers[event] <= 0:
-                del speakers[event]
+        idx = 0
+        while speakers:
+            idx += 1
+
+            # remove next event based on our (prio, deadline) sort order...
+            event, count = speakers.popitem(0)
 
             # yes, fetch the timestamp on EACH iteration because speaking can take multiple
             # seconds and cause time to slip between each check here.
@@ -115,9 +114,8 @@ def speakerRunner(speakers, notify):
 
             ran += 1
             logger.info(
-                "[{} of {} :: {} :: {} :: {} :: {}]: {}",
-                idx + 1,
-                everythingLen,
+                "[batch {} :: {} :: {} :: {} :: {}]: {}",
+                idx,
                 ran,
                 count,
                 event.priority,
@@ -137,7 +135,7 @@ class Awwdio:
     how_many: int = 0
 
     # deduplicating/debounce mechanism to avoid close-in-time received repeats
-    speaker: Counter = field(default_factory=Counter)
+    speaker: SortedDict = field(default_factory=SortedDict)
 
     notify: threading.Event = field(default_factory=threading.Event)
 
@@ -168,9 +166,12 @@ class Awwdio:
         ps.play()
 
     def speak(self, voice, say, speed, deadline=None, priority=0):
-        self.speaker[
-            SpeakEvent(voice, say, speed, deadline=deadline, priority=priority)
-        ] += 1
+        event = SpeakEvent(voice, say, speed, deadline=deadline, priority=priority)
+        if event in self.speaker:
+            self.speaker[event] += 1
+        else:
+            self.speaker[event] = 1
+
         self.notify.set()
 
     def start(self, host: str = "127.0.0.1", port: int = 8000) -> None:
