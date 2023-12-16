@@ -2,7 +2,6 @@ import asyncio
 import datetime
 
 import json
-import threading
 import os
 import pathlib
 import pprint as pp
@@ -11,8 +10,8 @@ import random
 import shlex
 import subprocess
 import sys
+import threading
 import time
-from sortedcontainers import SortedDict
 
 from dataclasses import dataclass, field
 
@@ -23,6 +22,7 @@ import pytz
 from fastapi import FastAPI, HTTPException
 from loguru import logger
 from scheduler.asyncio import Scheduler
+from sortedcontainers import SortedDict
 
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
