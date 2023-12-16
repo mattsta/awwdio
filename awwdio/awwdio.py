@@ -41,7 +41,9 @@ class SpeakEvent:
 
     priority: int = 0
 
-    sort_index: int = field(default=0, compare=False, hash=False)
+    sort_index: tuple[int, int] = field(
+        default=0, compare=False, hash=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         self.sort_index = (self.priority, self.deadline)
