@@ -54,6 +54,7 @@ def sayThingWhatNeedBeSaid(voice, what, speed):
     # Voices can be listed with: say -v\?
     # On older versions, the macOS `say` command randomly exits with an error of "Speaking failed: -128"
     # so if we get an error code, KEEP TRYING FOREVER instead of dropping messages.
+    # Though, we also get an error if you try to use an uninstalled voice, so this just loops until you install the voice...
     got = 1
     while got == 1:
         try:
@@ -82,6 +83,7 @@ def speakerRunner(speakers, notify):
     ran = 0
     while True:
         while not speakers:
+            # logger.info("Checking...")
             notify.wait()
 
         # reset the 'notify' wakeup flag to false so we sleep again the next time if there's
@@ -91,6 +93,7 @@ def speakerRunner(speakers, notify):
         # order elements in the task queue by (priority, deadline) for processing in priority order
         idx = 0
         while speakers:
+            # logger.info("Speaking: {}", speakers)
             idx += 1
 
             # remove next event based on our (prio, deadline) sort order...
@@ -103,7 +106,7 @@ def speakerRunner(speakers, notify):
             # if this event's speaking deadline has expired, don't speak anything.
             if event.deadline and now > event.deadline:
                 logger.info(
-                    "[Ignoring] :: {}] {:.2f} seconds expired: {}",
+                    "[Ignoring] :: {}] Expired {:.2f} seconds: {}",
                     count,
                     now - event.deadline,
                     event,
