@@ -86,10 +86,6 @@ def speakerRunner(speakers, notify):
             # logger.info("Checking...")
             notify.wait()
 
-        # reset the 'notify' wakeup flag to false so we sleep again the next time if there's
-        # no new updates ready.
-        notify.clear()
-
         # order elements in the task queue by (priority, deadline) for processing in priority order
         idx = 0
         while speakers:
@@ -129,6 +125,10 @@ def speakerRunner(speakers, notify):
             )
 
             sayThingWhatNeedBeSaid(event.voice, say, event.speed)
+
+        # reset the 'notify' wakeup flag to false so we sleep again the next time if there's
+        # no new updates ready.
+        notify.clear()
 
 
 @dataclass
