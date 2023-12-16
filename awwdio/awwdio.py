@@ -170,7 +170,7 @@ class Awwdio:
         ps = pygame.mixer.Sound(file=self.sounds.get(what))
         ps.play()
 
-    def speak(self, voice, say, speed, deadline=None, priority=0):
+    def speak(self, voice, say, speed, deadline=None, priority=-1):
         event = SpeakEvent(voice, say, speed, deadline=deadline, priority=priority)
         if event in self.speaker:
             self.speaker[event] += 1
@@ -222,7 +222,7 @@ class Awwdio:
         async def launch_hypercorn():
             async def speakToMe(voice, say, speed=250):
                 """Add speech request to speaker deduplication/debounce system."""
-                self.speak(voice, say, speed, 0)
+                self.speak(voice, say, speed, priority=-100)
 
             # Parse scheduled event feed then
             # Schedule our schedule of events
