@@ -140,7 +140,7 @@ class Awwdio:
     how_many: int = 0
 
     # deduplicating/debounce mechanism to avoid close-in-time received repeats
-    speaker: SortedDict = field(default_factory=SortedDict)
+    speakers: SortedDict = field(default_factory=SortedDict)
 
     notify: threading.Event = field(default_factory=threading.Event)
 
@@ -172,10 +172,12 @@ class Awwdio:
 
     def speak(self, voice, say, speed, deadline=None, priority=-1):
         event = SpeakEvent(voice, say, speed, deadline=deadline, priority=priority)
-        if event in self.speaker:
-            self.speaker[event] += 1
+
+        # this is basically mocking a Counter() (or defaultdict(int)) via SortedDict instead
+        if event in self.speakers:
+            self.speakers[event] += 1
         else:
-            self.speaker[event] = 1
+            self.speakers[event] = 1
 
         self.notify.set()
 
@@ -206,7 +208,7 @@ class Awwdio:
         ):
             # logger.info("Received: {}", (voice, say, speed, deadline, priority))
             self.speak(voice, say, speed, deadline, prio)
-            # logger.info("Current queue: {}", self.speaker)
+            # logger.info("Current queue: {}", self.speakers)
 
         # instead of running an external process-worker webserver, run it all locally
         # because we WANT a single-process non-multi-worker webserver here.
@@ -267,7 +269,9 @@ class Awwdio:
             await serve(self.app, config)
 
         try:
-            p = threading.Thread(target=speakerRunner, args=(self.speaker, self.notify))
+            p = threading.Thread(
+                target=speakerRunner, args=(self.speakers, self.notify)
+            )
 
             # without p.daemon, the Thread refuses to recognize KeyboardInterrupt properly and
             # then it requires a double CTRL-C to exit. Now it exits cleanly with one CTRL-C, but
@@ -279,7 +283,7 @@ class Awwdio:
         except (KeyboardInterrupt, SystemExit):
             logger.warning("Goodbye...")
             logger.warning(
-                "Remaining speak events unspoken: {}", pp.pformat(self.speaker)
+                "Remaining speak events unspoken: {}", pp.pformat(self.speakers)
             )
             p.terminate()
             p.join()
