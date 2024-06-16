@@ -144,6 +144,10 @@ class Awwdio:
 
     notify: threading.Event = field(default_factory=threading.Event)
 
+    # record the last time a sound was played so we can "debounce" individual sounds
+    # so they don't play 5x per second if triggered rapidly.
+    lastSound: dict[str, datetime.datetime.date] = field(default_factory=dict)
+
     # TODO: still need to print "X in backlog" events
     # TODO: still need to fix print-remaining-buffer-on-exit for trapping thread exit better
     def __post_init__(self) -> None:
@@ -195,6 +199,18 @@ class Awwdio:
             if not sound:
                 sound = random.choice(tuple(self.sounds.keys()))
 
+            now = pendulum.now()
+            if sound in self.lastSound:
+                lastPlayed = self.lastSound[sound]
+                if now - lastPlayed < datetime.timedelta(milliseconds=200):
+                    logger.warning(
+                        "[{}] Not playing because previous play was too soon ({})",
+                        sound,
+                        lastPlayed,
+                    )
+                    return
+
+            self.lastSound[sound] = now
             logger.info("[{}] Playing...", sound)
             self.play(sound)
 
