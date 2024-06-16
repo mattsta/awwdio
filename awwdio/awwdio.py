@@ -35,6 +35,9 @@ class SpeakEvent:
     say: str = "HELLO HELLO"
     speed: int = 250
 
+    # Anything extra to say but NOT included in duplicate checking
+    aux: str = field(default="", compare=False, hash=False)
+
     # if provided, don't speak this event if it is older than this epoch timestamp,
     # but also mark this field as not part of the object value for deduplication.
     deadline: int | float | None = field(default=None, compare=False, hash=False)
@@ -109,7 +112,7 @@ def speakerRunner(speakers, notify):
                 )
                 continue
 
-            say = event.say
+            say = event.say + event.aux
             if count > 1:
                 say += f" (repeated {count})"
 
@@ -174,8 +177,10 @@ class Awwdio:
         ps = pygame.mixer.Sound(file=self.sounds.get(what))
         ps.play()
 
-    def speak(self, voice, say, speed, deadline=None, priority=-1):
-        event = SpeakEvent(voice, say, speed, deadline=deadline, priority=priority)
+    def speak(self, voice, say, speed, deadline=None, priority=-1, aux=""):
+        event = SpeakEvent(
+            voice, say, speed, deadline=deadline, priority=priority, aux=aux
+        )
 
         # this is basically mocking a Counter() (or defaultdict(int)) via SortedDict instead
         if event in self.speakers:
@@ -221,9 +226,10 @@ class Awwdio:
             speed: int = 250,
             deadline: int | float | None = None,
             prio: int = 100,
+            aux: str = "",
         ):
             # logger.info("Received: {}", (voice, say, speed, deadline, priority))
-            self.speak(voice, say, speed, deadline, prio)
+            self.speak(voice, say, speed, deadline, prio, aux)
             # logger.info("Current queue: {}", self.speakers)
 
         # instead of running an external process-worker webserver, run it all locally
