@@ -24,6 +24,8 @@ from loguru import logger
 from scheduler.asyncio import Scheduler
 from sortedcontainers import SortedDict
 
+from scheduler.trigger import Monday, Tuesday, Wednesday, Thursday, Friday, Sunday
+
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
 import pygame
@@ -270,6 +272,38 @@ class Awwdio:
                             schedule.minutely(fortime, speakToMe, args=(voice, say))
                         case "hourly":
                             schedule.hourly(fortime, speakToMe, args=(voice, say))
+                        case "m-f":
+                            schedule.weekly(
+                                Monday(fortime), speakToMe, args=(voice, say)
+                            )
+                            schedule.weekly(
+                                Tuesday(fortime), speakToMe, args=(voice, say)
+                            )
+                            schedule.weekly(
+                                Wednesday(fortime), speakToMe, args=(voice, say)
+                            )
+                            schedule.weekly(
+                                Thursday(fortime), speakToMe, args=(voice, say)
+                            )
+                            schedule.weekly(
+                                Friday(fortime), speakToMe, args=(voice, say)
+                            )
+                        case "s-th":
+                            schedule.weekly(
+                                Sunday(fortime), speakToMe, args=(voice, say)
+                            )
+                            schedule.weekly(
+                                Monday(fortime), speakToMe, args=(voice, say)
+                            )
+                            schedule.weekly(
+                                Tuesday(fortime), speakToMe, args=(voice, say)
+                            )
+                            schedule.weekly(
+                                Wednesday(fortime), speakToMe, args=(voice, say)
+                            )
+                            schedule.weekly(
+                                Thursday(fortime), speakToMe, args=(voice, say)
+                            )
                         case "daily":
                             schedule.daily(
                                 fortime,
